@@ -3,7 +3,7 @@ const { UserRepository } = require("../repositories");
 const AppError = require("../utils/error/app-error");
 const userRepository = new UserRepository();
 const bcrypt = require("bcrypt");
-const { checkPassword, createToken } = require("../utils/common/auth");
+const { checkPassword, createToken, verifyToken } = require("../utils/common/auth");
 
 async function createUser(data) {
   try {
@@ -50,7 +50,31 @@ async function signIn(data) {
   }
 }
 
+async function isAuthenticated(token) {
+    try {
+        if (!token) {
+            throw new AppError("Missing token", StatusCodes.BAD_REQUEST);
+        }
+        const response = verifyToken(token);
+        const user = await userRepository.get(response.id);
+        if (!user) {
+            throw new AppError("User not found", StatusCodes.NOT_FOUND);
+        }
+        return user.id;
+    } catch (error) {
+        if (error instanceof AppError) throw error;
+        if (error.name == 'JsonWebTokenError') {
+             throw new AppError("Invalid token", StatusCodes.BAD_REQUEST);
+        }
+       throw new AppError(
+         `Something went wrong - ${error.message}`,
+         StatusCodes.INTERNAL_SERVER_ERROR
+       );
+    }
+}
+
 module.exports = {
   createUser,
   signIn,
+  isAuthenticated,
 };
