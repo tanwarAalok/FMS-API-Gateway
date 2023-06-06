@@ -1,13 +1,17 @@
 const { StatusCodes } = require("http-status-codes");
-const { UserRepository } = require("../repositories");
+const { UserRepository, RoleRepository } = require("../repositories");
 const AppError = require("../utils/error/app-error");
 const userRepository = new UserRepository();
+const roleRepository = new RoleRepository();
 const bcrypt = require("bcrypt");
 const { checkPassword, createToken, verifyToken } = require("../utils/common/auth");
+const { USER_ROLES_ENUMS } = require('../utils/common/enum');
 
 async function createUser(data) {
   try {
     const user = await userRepository.create(data);
+    const role = await roleRepository.getRoleByName(USER_ROLES_ENUMS.CUSTOMER);
+    user.addRole(role);
     return user;
   } catch (error) {
     if (
@@ -76,8 +80,51 @@ async function isAuthenticated(token) {
     }
 }
 
+async function addRoleToUser(data) {
+  try {
+    const user = await userRepository.get(data.id);
+    if (!user) {
+      throw new AppError("User not found !", StatusCodes.NOT_FOUND);
+    }
+    const role = await roleRepository.getRoleByName(data.role);
+    if (!role) {
+      throw new AppError("Role not found !", StatusCodes.NOT_FOUND);
+    }
+    user.addRole(role);
+    return user;
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      `Something went wrong - ${error.message}`,
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
+  }
+}
+
+async function isAdmin(id) {
+  try {
+    const user = await userRepository.get(id);
+    if (!user) {
+      throw new AppError("User not found !", StatusCodes.NOT_FOUND);
+    }
+    const adminRole = await roleRepository.getRoleByName(USER_ROLES_ENUMS.ADMIN);
+    if (!adminRole) {
+      throw new AppError("Role not found !", StatusCodes.NOT_FOUND);
+    }
+    return user.hasRole(adminRole);
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      `Something went wrong - ${error.message}`,
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
+  }
+}
+
 module.exports = {
   createUser,
   signIn,
   isAuthenticated,
+  addRoleToUser,
+  isAdmin,
 };
